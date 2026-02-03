@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Safe Builders: Community Life</title>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Nunito:wght@400;700;900&display=swap');
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: #f0f9ff;
+            user-select: none;
+            overflow: hidden;
+        }
+
+        .hand-font {
+            font-family: 'Patrick Hand', cursive;
+        }
+
+        /* --- 3D Board Effect --- */
+        .board-container {
+            perspective: 1000px;
+        }
+        
+        .board-plane {
+            transform: rotateX(25deg) scale(0.9);
+            transform-style: preserve-3d;
+            transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .tile {
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            box-shadow: 0 6px 0px rgba(0,0,0,0.1); 
+        }
+        
+        .tile:hover {
+            transform: translateY(-8px);
+            z-index: 50 !important;
+        }
+
+        /* --- Dice Styling --- */
+        .dice-box {
+            transition: all 0.2s;
+            background: linear-gradient(145deg, #ffffff, #f0f0f0);
+        }
+        .dice-box:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+        
+        /* Loading Bar */
+        .loading-bar-bg {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 99px;
+            overflow: hidden;
+        }
+        .loading-bar-fill {
+            height: 100%;
+            background: #ffffff;
+            transition: width 0.3s ease-out;
+        }
+
+        /* --- Player Token "Peg" Style --- */
+        .player-peg {
+            width: 24px;
+            height: 40px;
+            border-radius: 12px 12px 4px 4px;
+            box-shadow: 2px 4px 6px rgba(0,0,0,0.4);
+            position: relative;
+            transition: all 0.4s ease-out;
+            transform-origin: bottom center;
+            border: 2px solid white;
+        }
+        .player-peg::after {
+            content: '';
+            position: absolute;
+            top: 4px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 16px;
+            height: 16px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 50%;
+        }
+
+        /* Nametag */
+        .nametag {
+            position: absolute;
+            top: -24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: bold;
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+            z-index: 100;
+        }
+        .tile:hover .nametag, .player-peg:hover .nametag {
+            opacity: 1;
+        }
+        .nametag.active {
+            opacity: 1;
+            background: #2563eb;
+            top: -28px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        /* --- Confetti Animation --- */
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #f00;
+            animation: confetti-fall 3s linear infinite;
+        }
+        @keyframes confetti-fall {
+            0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        }
+
+        /* --- UI Animations --- */
+        @keyframes bounce-slow {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        .animate-bounce-slow { animation: bounce-slow 2s infinite; }
+
+        @keyframes pop-in {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-pop { animation: pop-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+
+        /* --- Device Frames --- */
+        .device-frame {
+            transition: all 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+            background: white;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .device-mobile {
+            width: 375px;
+            height: 700px;
+            border-radius: 40px;
+            border: 12px solid #1e293b;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+        
+        .device-ipad {
+            width: 768px;
+            height: 1024px;
+            border-radius: 30px;
+            border: 12px solid #334155;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .device-pc {
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 0;
+            box-shadow: none;
+        }
+
+        /* Scrollbar hiding for cleaner frames */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-900">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- GAME CONFIGURATION ---
+
+        const GROUP_MEMBERS = [
+            "Janella Denise Agbay", "Jillian Margaret Garing", "Isabelle Abareta",
+            "John Calix Reyes", "Zean Jaybriel Melo", "Alfeiah Louize Dainelle Pamilar",
+            "Donn Nathaniel Britania", "Marcus Stephen Castillo", "Breanne Wyhnne Manay"
+        ];
+
+        const ROLES = [
+            { id: 'eco', name: "Eco Warrior", icon: "plant", color: "bg-green-500", desc: "Bonus on Green spaces" },
+            { id: 'safety', name: "Safety Patrol", icon: "shield-check", color: "bg-blue-500", desc: "Immune to Hazards" },
+            { id: 'leader', name: "Civic Leader", icon: "megaphone", color: "bg-purple-500", desc: "Starts with +2 Tokens" },
+            { id: 'helper', name: "Community Helper", icon: "hand-heart", color: "bg-orange-500", desc: "Action Card Bonus" },
+            { id: 'builder', name: "Master Builder", icon: "hammer", color: "bg-red-500", desc: "Strong on Stop spaces" },
+            { id: 'planner', name: "City Planner", icon: "map-trifold", color: "bg-teal-500", desc: "No Traffic Fines" },
+            { id: 'artist', name: "Local Artist", icon: "paint-brush", color: "bg-pink-500", desc: "Bonus on Start" },
+            { id: 'tech', name: "Tech Guru", icon: "laptop", color: "bg-indigo-500", desc: "Reroll once per game" },
+            { id: 'doctor', name: "Village Doctor", icon: "first-aid", color: "bg-rose-500", desc: "Bonus on Payday" },
+            { id: 'gardener', name: "Gardener", icon: "flower", color: "bg-lime-500", desc: "Bonus on Park spaces" }
+        ];
+
+        const PATH_LENGTH = 30;
+        
+        const TILE_TYPES = {
+            START: { color: "bg-emerald-100 border-emerald-300", icon: "flag", label: "START" },
+            NORMAL: { color: "bg-white border-slate-200", icon: null, label: "" },
+            ACTION: { color: "bg-orange-50 border-orange-200", icon: "cards", label: "ACTION" },
+            PAYDAY: { color: "bg-yellow-50 border-yellow-200", icon: "money", label: "PAYDAY" },
+            STOP: { color: "bg-red-500 border-red-700 text-white", icon: "hand-palm", label: "STOP!" },
+            HAZARD: { color: "bg-slate-200 border-slate-300", icon: "warning", label: "HAZARD" },
+            FINISH: { color: "bg-gradient-to-br from-yellow-300 to-yellow-500 border-yellow-600", icon: "trophy", label: "RETIRE" }
+        };
+
+        const generateBoard = () => {
+            let board = [];
+            for (let i = 0; i < PATH_LENGTH; i++) {
+                let type = TILE_TYPES.NORMAL;
+                if (i === 0) type = TILE_TYPES.START;
+                else if (i === PATH_LENGTH - 1) type = TILE_TYPES.FINISH;
+                else if ([5, 12, 18, 24].includes(i)) type = TILE_TYPES.PAYDAY;
+                else if ([3, 8, 15, 22, 27].includes(i)) type = TILE_TYPES.ACTION;
+                else if ([10, 20].includes(i)) type = TILE_TYPES.STOP;
+                else if ([6, 17, 25].includes(i)) type = TILE_TYPES.HAZARD;
+                
+                board.push({ index: i, ...type });
+            }
+            return board;
+        };
+
+        const BOARD_DATA = generateBoard();
+
+        const CARDS = [
+            { title: "Recycling Drive", text: "You led the recycling team!", reward: 2, type: "good" },
+            { title: "Fixed a Fence", text: "Kept the playground safe.", reward: 1, type: "good" },
+            { title: "Traffic Violation", text: "Jaywalking! Pay a fine.", reward: -1, type: "bad" },
+            { title: "Block Party", text: "Organized a party for neighbors.", reward: 3, type: "good" },
+            { title: "Lost Dog", text: "Helped find a lost puppy.", reward: 2, type: "good" }
+        ];
+
+        const STOP_EVENTS = {
+            10: { title: "Mid-Term Project", text: "Major community event! Organize the team.", reward: 5 },
+            20: { title: "Disaster Drill", text: "Earthquake drill in progress. Stay safe!", reward: 5 }
+        };
+
+        // --- UI & UTILITY COMPONENTS ---
+
+        const Confetti = () => {
+            const pieces = Array.from({ length: 50 }).map((_, i) => ({
+                id: i,
+                left: Math.random() * 100 + '%',
+                delay: Math.random() * 2 + 's',
+                color: ['#ef4444', '#3b82f6', '#eab308', '#22c55e', '#a855f7'][Math.floor(Math.random() * 5)]
+            }));
+            return (
+                <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+                    {pieces.map(p => (
+                        <div key={p.id} className="confetti rounded-full opacity-80" style={{ left: p.left, animationDelay: p.delay, backgroundColor: p.color }} />
+                    ))}
+                </div>
+            );
+        };
+
+        const TurnOverlay = ({ playerName, visible }) => {
+            if (!visible) return null;
+            return (
+                <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in pointer-events-none">
+                    <div className="bg-white px-12 py-8 rounded-2xl shadow-2xl transform scale-110 animate-pop border-4 border-blue-500">
+                        <div className="text-sm font-bold text-gray-400 uppercase tracking-widest text-center mb-2">Get Ready</div>
+                        <h2 className="text-4xl font-bold text-slate-800 hand-font text-center">{playerName}'s Turn</h2>
+                    </div>
+                </div>
+            );
+        };
+
+        const LoadingScreen = ({ onComplete }) => {
+            const [progress, setProgress] = useState(0);
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    setProgress(prev => {
+                        if (prev >= 100) { clearInterval(interval); setTimeout(onComplete, 600); return 100; }
+                        return prev + 4;
+                    });
+                }, 50);
+                return () => clearInterval(interval);
+            }, []);
+            return (
+                <div className="absolute inset-0 bg-blue-600 z-50 flex flex-col items-center justify-center text-white">
+                    <div className="mb-6 animate-bounce-slow relative">
+                        <div className="absolute inset-0 bg-white/20 blur-xl rounded-full scale-150"></div>
+                        <i className="ph-fill ph-buildings text-9xl relative z-10"></i>
+                    </div>
+                    <h1 className="text-5xl font-bold hand-font mb-2">Safe Builders</h1>
+                    <p className="text-blue-200 mb-8 font-bold tracking-wide">Community Life</p>
+                    <div className="w-64 h-3 loading-bar-bg mb-2">
+                        <div className="loading-bar-fill" style={{ width: `${progress}%` }}></div>
+                    </div>
+                </div>
+            );
+        };
+
+        const SetupWizard = ({ onComplete }) => {
+            const [step, setStep] = useState(1);
+            const [playerCount, setPlayerCount] = useState(2);
+            const [currentSetupIdx, setCurrentSetupIdx] = useState(0);
+            const [players, setPlayers] = useState([]);
+            const [takenRoleIds, setTakenRoleIds] = useState([]);
+            const [name, setName] = useState("Player 1");
+            const [selectedRole, setSelectedRole] = useState(null);
+
+            const handleNextPlayer = () => {
+                if (!selectedRole) return;
+                const newPlayer = {
+                    id: currentSetupIdx,
+                    name: name || `Player ${currentSetupIdx + 1}`,
+                    role: selectedRole,
+                    pos: 0,
+                    tokens: selectedRole.id === 'leader' ? 2 : 0,
+                    color: selectedRole.color.replace('bg-', ''),
+                    rank: null,
+                    retired: false
+                };
+                const updatedPlayers = [...players, newPlayer];
+                const updatedRoles = [...takenRoleIds, selectedRole.id];
+                
+                if (updatedPlayers.length < playerCount) {
+                    setPlayers(updatedPlayers);
+                    setTakenRoleIds(updatedRoles);
+                    setCurrentSetupIdx(prev => prev + 1);
+                    setName(`Player ${currentSetupIdx + 2}`);
+                    setSelectedRole(null);
+                } else {
+                    onComplete(updatedPlayers);
+                }
+            };
+
+            if (step === 1) {
+                return (
+                    <div className="absolute inset-0 bg-sky-50 z-50 flex flex-col items-center justify-center p-4">
+                        <div className="bg-white p-10 rounded-[2rem] shadow-2xl border-4 border-white text-center animate-pop">
+                            <h2 className="text-4xl font-bold text-slate-800 mb-6 hand-font">How Many Players?</h2>
+                            <div className="flex flex-col items-center gap-6">
+                                <div className="flex items-center gap-4">
+                                    <button onClick={() => setPlayerCount(Math.max(2, playerCount - 1))} className="w-12 h-12 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-xl font-bold">-</button>
+                                    <div className="w-24 h-24 bg-blue-500 rounded-2xl flex items-center justify-center text-5xl font-black text-white shadow-lg">{playerCount}</div>
+                                    <button onClick={() => setPlayerCount(Math.min(8, playerCount + 1))} className="w-12 h-12 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-xl font-bold">+</button>
+                                </div>
+                                <button onClick={() => { setStep(2); setName("Player 1"); }} className="px-10 py-3 bg-blue-600 text-white rounded-full font-bold shadow-lg hover:bg-blue-700 hover:scale-105 transition-all mt-4">Confirm & Start</button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+            return (
+                <div className="absolute inset-0 bg-sky-50 z-50 flex flex-col items-center justify-center p-4 overflow-auto">
+                    <div className="w-full max-w-6xl bg-white rounded-[2rem] shadow-2xl p-8 border-4 border-white ring-4 ring-sky-100/50 flex flex-col max-h-full">
+                        <div className="text-center mb-6 flex-shrink-0">
+                            <h2 className="text-4xl font-bold text-slate-800 hand-font">Setup: Player {currentSetupIdx + 1}</h2>
+                            <p className="text-slate-400 font-bold">Choose your identity</p>
+                        </div>
+                        <div className="flex flex-col items-center gap-6 flex-grow overflow-y-auto">
+                            <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="text-center text-3xl font-bold p-3 rounded-2xl bg-slate-50 border-2 border-slate-200 focus:border-blue-500 focus:bg-white outline-none w-80 transition-all placeholder:text-slate-300" placeholder="Enter Name" maxLength={12} />
+                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 w-full p-2">
+                                {ROLES.map(role => {
+                                    const isTaken = takenRoleIds.includes(role.id);
+                                    return (
+                                        <button key={role.id} onClick={() => !isTaken && setSelectedRole(role)} disabled={isTaken} className={`relative p-3 rounded-2xl border-2 transition-all flex flex-col items-center text-center gap-2 overflow-hidden group ${isTaken ? 'opacity-50 grayscale cursor-not-allowed bg-slate-100 border-slate-200' : selectedRole?.id === role.id ? 'border-blue-500 bg-blue-50 scale-105 shadow-lg' : 'border-slate-100 bg-white hover:border-blue-200 hover:shadow-md'}`}>
+                                            <div className={`w-12 h-12 rounded-full ${role.color} flex items-center justify-center text-white text-2xl shadow-md ${!isTaken && 'group-hover:scale-110'} transition-transform`}><i className={`ph-fill ph-${role.icon}`}></i></div>
+                                            <div><div className="font-bold text-sm text-slate-800 leading-tight">{role.name}</div><div className="text-[10px] text-slate-500 font-bold mt-1 leading-tight">{role.desc}</div></div>
+                                            {isTaken && (<div className="absolute inset-0 bg-black/10 flex items-center justify-center"><span className="bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded rotate-[-15deg]">TAKEN</span></div>)}
+                                            {selectedRole?.id === role.id && (<div className="absolute top-2 right-2 text-blue-500"><i className="ph-fill ph-check-circle text-xl"></i></div>)}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <button onClick={handleNextPlayer} disabled={!name || !selectedRole} className={`px-16 py-4 rounded-full font-bold text-xl shadow-xl transition-all hover:-translate-y-1 active:translate-y-0 mt-auto flex-shrink-0 ${(!name || !selectedRole) ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white'}`}>
+                                {players.length + 1 === playerCount ? "Start Adventure" : "Next Player"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const Dice = ({ onRoll, rolling, value, playerColor }) => {
+            return (
+                <div className="flex flex-col items-center gap-4 py-4">
+                     <button onClick={onRoll} disabled={rolling} className={`dice-box w-24 h-24 rounded-2xl border-b-8 flex items-center justify-center transition-all relative overflow-hidden group active:border-b-0 ${rolling ? 'border-slate-300 cursor-wait' : 'cursor-pointer hover:-translate-y-1'}`} style={{ borderColor: '#cbd5e1' }}>
+                        {rolling ? (<i className="ph-duotone ph-spinner animate-spin text-5xl text-slate-300"></i>) : (<div className="flex items-center justify-center transform group-hover:scale-110 transition-transform">{value ? (<i className={`ph-fill ph-dice-${['one','two','three','four','five','six'][value-1]} text-6xl`} style={{color: playerColor ? `var(--tw-color-${playerColor})` : '#334155'}}></i>) : (<div className="flex flex-col items-center"><i className="ph-duotone ph-dice-five text-5xl text-slate-300 group-hover:text-blue-400 transition-colors"></i><span className="text-xs font-black text-slate-400 uppercase tracking-widest mt-1">TAP</span></div>)}</div>)}
+                    </button>
+                </div>
+            );
+        };
+
+        const Modal = ({ show, title, children, onClose, color="blue" }) => {
+            if (!show) return null;
+            const colorMap = { blue: "bg-blue-600", red: "bg-red-500", green: "bg-green-600", yellow: "bg-yellow-500" };
+            return (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden animate-pop border-4 border-white">
+                        <div className={`${colorMap[color] || 'bg-slate-700'} p-5 text-white text-center relative overflow-hidden`}>
+                            <div className="absolute inset-0 bg-white/10 opacity-50" style={{backgroundImage: 'radial-gradient(circle, transparent 20%, #000 20%)', backgroundSize: '10px 10px'}}></div>
+                            <h2 className="text-2xl font-bold hand-font relative z-10">{title}</h2>
+                        </div>
+                        <div className="p-8 text-center">{children}</div>
+                        <div className="bg-slate-50 p-4 flex justify-center border-t border-slate-100">
+                            <button onClick={onClose} className="bg-slate-800 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-slate-900 hover:scale-105 transition-all">Awesome</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- MAIN GAME LOGIC COMPONENT ---
+        const GameEngine = ({ viewMode }) => {
+            const [view, setView] = useState('loading'); 
+            const [players, setPlayers] = useState([]);
+            const [currentPlayerIdx, setCurrentIdx] = useState(0);
+            const [diceVal, setDiceVal] = useState(null);
+            const [rolling, setRolling] = useState(false);
+            const [modal, setModal] = useState({ show: false, title: "", content: null, color: "blue" });
+            const [showTurnOverlay, setShowTurnOverlay] = useState(false);
+            const [logs, setLogs] = useState([]);
+            const [tab, setTab] = useState('board');
+            const [rankCounter, setRankCounter] = useState(1);
+
+            const currentPlayer = players[currentPlayerIdx];
+            const isMobile = viewMode === 'mobile';
+            const isTablet = viewMode === 'ipad';
+            const isPC = viewMode === 'pc';
+
+            const addLog = (msg) => { setLogs(prev => [`Turn ${players.reduce((acc,p)=>acc+p.pos,0)}: ${msg}`, ...prev].slice(0, 10)); };
+            const startGame = (setupPlayers) => { setPlayers(setupPlayers); setView('game'); showTurn(setupPlayers[0]); };
+            const showTurn = (player) => { setShowTurnOverlay(true); setTimeout(() => setShowTurnOverlay(false), 1500); };
+
+            const nextTurn = () => {
+                setDiceVal(null);
+                let nextIdx = (currentPlayerIdx + 1) % players.length;
+                let attempts = 0;
+                while (players[nextIdx].retired && attempts < players.length) {
+                    nextIdx = (nextIdx + 1) % players.length;
+                    attempts++;
+                }
+                if (attempts >= players.length) { setView('gameover'); return; }
+                setCurrentIdx(nextIdx);
+                showTurn(players[nextIdx]);
+            };
+
+            const checkGameOver = (updatedPlayers) => {
+                const activePlayers = updatedPlayers.filter(p => !p.retired);
+                if (activePlayers.length === 1 && updatedPlayers.length > 1) {
+                    const loser = activePlayers[0];
+                    loser.rank = 'LOSER';
+                    loser.retired = true;
+                    setPlayers(updatedPlayers);
+                    setTimeout(() => setView('gameover'), 1000);
+                    return true; 
+                }
+                if (activePlayers.length === 0) {
+                    setPlayers(updatedPlayers);
+                    setTimeout(() => setView('gameover'), 1000);
+                    return true;
+                }
+                return false;
+            };
+
+            const handleRoll = () => {
+                if (rolling) return;
+                setRolling(true);
+                let rolls = 0;
+                const rollInterval = setInterval(() => {
+                    setDiceVal(Math.floor(Math.random() * 6) + 1);
+                    rolls++;
+                    if (rolls > 10) {
+                        clearInterval(rollInterval);
+                        const finalVal = Math.floor(Math.random() * 6) + 1;
+                        setDiceVal(finalVal);
+                        setRolling(false);
+                        movePlayer(finalVal);
+                    }
+                }, 80);
+            };
+
+            const movePlayer = (steps) => {
+                let current = currentPlayer.pos;
+                let remaining = steps;
+                const walk = setInterval(() => {
+                    const nextPos = current + 1;
+                    const tile = BOARD_DATA[nextPos];
+                    if (tile && tile.label === "STOP!") {
+                        remaining = 0; current = nextPos; updatePos(current); clearInterval(walk); setTimeout(() => handleStopEvent(current), 500); return;
+                    }
+                    if (remaining > 0 && current < PATH_LENGTH - 1) {
+                        current++; updatePos(current); remaining--;
+                    } else {
+                        clearInterval(walk); setTimeout(() => handleLand(current), 500);
+                    }
+                }, 300);
+            };
+
+            const updatePos = (pos) => { setPlayers(prev => { const newPlayers = [...prev]; newPlayers[currentPlayerIdx].pos = pos; return newPlayers; }); };
+            const updateTokens = (amt) => { setPlayers(prev => { const newPlayers = [...prev]; newPlayers[currentPlayerIdx].tokens = Math.max(0, newPlayers[currentPlayerIdx].tokens + amt); return newPlayers; }); };
+            
+            const closeModal = () => {
+                setModal({ ...modal, show: false });
+                if (view !== 'gameover') {
+                    if (currentPlayer.retired) {
+                        const isOver = checkGameOver(players);
+                        if (!isOver) nextTurn();
+                    } else {
+                        nextTurn();
+                    }
+                }
+            };
+
+            const handleStopEvent = (pos) => {
+                const event = STOP_EVENTS[pos];
+                updateTokens(event.reward);
+                addLog(`${currentPlayer.name} hit a STOP event: ${event.title}`);
+                setModal({ show: true, title: "COMMUNITY EVENT!", color: "red", content: (<div><p className="text-xl font-bold mb-2 text-slate-800">{event.title}</p><p className="mb-4 text-slate-500">{event.text}</p><div className="inline-block bg-green-100 text-green-700 px-4 py-2 rounded-lg font-bold shadow-sm">+ {event.reward} Tokens Reward</div></div>) });
+            };
+
+            const handleLand = (pos) => {
+                const tile = BOARD_DATA[pos];
+                if (tile.label === "RETIRE") {
+                    addLog(`${currentPlayer.name} finished the game!`);
+                    const updatedPlayers = [...players];
+                    updatedPlayers[currentPlayerIdx].retired = true;
+                    updatedPlayers[currentPlayerIdx].rank = rankCounter;
+                    setPlayers(updatedPlayers);
+                    setRankCounter(prev => prev + 1);
+                    const isOver = checkGameOver(updatedPlayers);
+                    if (isOver) return;
+                    setModal({ show: true, title: "Retired!", color: "yellow", content: (<div><i className="ph-fill ph-trophy text-6xl text-yellow-500 mb-2"></i><h3 className="text-2xl font-bold">You Finished {rankCounter === 1 ? '1st' : rankCounter === 2 ? '2nd' : rankCounter + 'th'}!</h3><p>Wait for the others to finish.</p></div>) });
+                    return;
+                }
+                if (tile.label === "ACTION") {
+                    const card = CARDS[Math.floor(Math.random() * CARDS.length)];
+                    const bonus = currentPlayer.role.id === 'helper' ? 1 : 0;
+                    const totalReward = card.reward + bonus;
+                    updateTokens(totalReward);
+                    addLog(`${currentPlayer.name} drew Action: ${card.title}`);
+                    setModal({ show: true, title: "Action Card", color: "blue", content: (<div><i className={`ph-fill ${card.type === 'good' ? 'ph-thumbs-up text-green-500' : 'ph-warning text-red-500'} text-5xl mb-4`}></i><h3 className="text-xl font-bold text-slate-800 mb-1">{card.title}</h3><p className="text-slate-500 mb-4">{card.text}</p><div className="font-bold text-lg bg-slate-100 p-2 rounded-lg">{totalReward > 0 ? `+${totalReward}` : totalReward} Tokens{bonus > 0 && <span className="text-xs block text-orange-500">(Helper Bonus!)</span>}</div></div>) });
+                } else if (tile.label === "PAYDAY") {
+                    updateTokens(3);
+                    addLog(`${currentPlayer.name} got Paid!`);
+                    setModal({ show: true, title: "PAYDAY!", color: "green", content: (<div className="flex flex-col items-center"><i className="ph-fill ph-money text-green-500 text-6xl animate-bounce mb-2"></i><p className="text-lg font-bold text-slate-700">Community Grant</p><p className="text-3xl font-black text-green-600">+3 Tokens</p></div>) });
+                } else if (tile.label === "HAZARD") {
+                    if (currentPlayer.role.id === 'safety') {
+                        addLog(`${currentPlayer.name} avoided hazard.`);
+                        setModal({ show: true, title: "Hazard Avoided!", color: "blue", content: <p className="text-slate-600">Your <strong className="text-blue-500">Safety Patrol</strong> training helped you avoid the danger!</p> });
+                    } else {
+                        updateTokens(-1);
+                        addLog(`${currentPlayer.name} hit a hazard.`);
+                        setModal({ show: true, title: "Hazard!", color: "yellow", content: (<div><i className="ph-fill ph-warning text-yellow-500 text-5xl mb-4"></i><p className="text-slate-700 mb-2">Construction debris caused a delay.</p><p className="font-black text-red-500 text-xl">-1 Token</p></div>) });
+                    }
+                } else {
+                    nextTurn();
+                }
+            };
+            const getRankSuffix = (n) => { if (n === 'LOSER') return ''; if (n === 1) return 'st'; if (n === 2) return 'nd'; if (n === 3) return 'rd'; return 'th'; };
+
+            return (
+                <div className={`relative overflow-hidden bg-slate-50 w-full h-full flex flex-col`}>
+                    {view === 'loading' && <LoadingScreen onComplete={() => setView('setup')} />}
+                    {view === 'setup' && <SetupWizard onComplete={startGame} />}
+
+                    {view === 'gameover' && (
+                        <div className="absolute inset-0 bg-slate-900 z-50 flex items-center justify-center p-4">
+                            <Confetti />
+                            <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-4xl w-full text-center animate-pop relative z-10 border-8 border-blue-500 overflow-y-auto max-h-[90vh]">
+                                <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 bg-blue-500 text-white px-8 py-3 rounded-full font-black uppercase tracking-widest shadow-lg border-4 border-white">Final Standings</div>
+                                <h1 className="text-5xl font-bold hand-font text-slate-800 mb-2 mt-4">Game Over!</h1>
+                                <p className="text-slate-500 mb-8 font-bold">The neighborhood is safe, but who was fastest?</p>
+                                <div className="space-y-4 mb-8">
+                                    {[...players].sort((a,b) => { if (a.rank === 'LOSER') return 1; if (b.rank === 'LOSER') return -1; return a.rank - b.rank; }).map((p, idx) => (
+                                        <div key={p.id} className={`flex items-center justify-between p-4 rounded-xl border-4 relative overflow-hidden ${p.rank === 'LOSER' ? 'bg-red-50 border-red-200 opacity-90' : p.rank === 1 ? 'bg-yellow-50 border-yellow-400 scale-105 shadow-xl z-10' : 'bg-slate-50 border-slate-200'}`}>
+                                            {p.rank === 1 && <div className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-xs font-bold px-3 py-1 rounded-bl-xl">WINNER</div>}
+                                            {p.rank === 'LOSER' && <div className="absolute top-0 right-0 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-bl-xl">LOSER</div>}
+                                            <div className="flex items-center gap-6">
+                                                <div className={`w-12 h-12 rounded-full flex items-center justify-center font-black text-xl shadow-inner ${p.rank === 1 ? 'bg-yellow-400 text-yellow-900' : p.rank === 2 ? 'bg-slate-300 text-slate-600' : p.rank === 3 ? 'bg-orange-300 text-orange-800' : p.rank === 'LOSER' ? 'bg-red-200 text-red-500' : 'bg-slate-200'}`}>{p.rank === 'LOSER' ? 'L' : p.rank}</div>
+                                                <div className="text-left">
+                                                    <div className="font-bold text-slate-800 text-xl flex items-center gap-2">{p.name}<span className="text-xs bg-slate-200 px-2 py-0.5 rounded text-slate-500 uppercase">{p.role.name}</span></div>
+                                                    <div className="text-sm font-bold text-slate-400">{p.rank === 'LOSER' ? 'Did not finish' : `Finished ${p.rank}${getRankSuffix(p.rank)}`}</div>
+                                                </div>
+                                            </div>
+                                            <div className="text-3xl font-black text-slate-700 flex flex-col items-end"><span>{p.tokens} 🪙</span><span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Total Score</span></div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="bg-slate-100 p-4 rounded-xl text-left mb-6">
+                                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Developed By Group 2</h4>
+                                    <div className="flex flex-wrap gap-2 text-xs text-slate-600 font-bold">{GROUP_MEMBERS.map(m => <span key={m} className="bg-white px-2 py-1 rounded shadow-sm">{m}</span>)}</div>
+                                </div>
+                                <button onClick={() => window.location.reload()} className="bg-slate-800 text-white px-12 py-4 rounded-full font-bold shadow-xl hover:bg-slate-900 hover:scale-105 transition-transform">Start New Game</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {view === 'game' && (
+                        <div className={`flex h-full w-full ${isMobile || isTablet ? 'flex-col' : 'flex-row'}`}>
+                            <TurnOverlay playerName={currentPlayer.name} visible={showTurnOverlay} />
+                            
+                            {/* BOARD AREA */}
+                            <div className="flex-grow bg-sky-100 relative overflow-hidden flex items-center justify-center p-4 board-container">
+                                <div className="absolute top-4 left-4 text-green-600/10 pointer-events-none"><i className="ph-fill ph-tree text-8xl"></i></div>
+                                <div className="absolute bottom-4 right-4 text-blue-600/10 pointer-events-none"><i className="ph-fill ph-buildings text-8xl"></i></div>
+
+                                <div className="board-plane bg-white p-4 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-8 border-white overflow-visible">
+                                    <div className={`grid gap-2 ${isMobile ? 'grid-cols-4' : 'grid-cols-6'}`}>
+                                        {BOARD_DATA.map((tile) => (
+                                            <div key={tile.index} className={`tile ${isMobile ? 'w-12 h-12' : 'w-16 h-16 md:w-20 md:h-20'} rounded-xl flex flex-col items-center justify-center text-center p-0.5 border-b-4 relative ${tile.color}`}>
+                                                <span className="text-[8px] absolute top-0.5 left-1 opacity-30 font-black">{tile.index + 1}</span>
+                                                {tile.icon && <i className={`ph-fill ph-${tile.icon} ${isMobile ? 'text-xl' : 'text-2xl md:text-3xl'} opacity-60`}></i>}
+                                                <span className={`text-[6px] md:text-[8px] font-black uppercase tracking-tight mt-0.5 opacity-70 leading-none`}>{tile.label}</span>
+                                                <div className="absolute -top-3 left-0 right-0 flex justify-center -space-x-1.5 pointer-events-none" style={{zIndex: 20}}>
+                                                    {players.filter(p => p.pos === tile.index && !p.retired).map((p, idx) => (
+                                                        <div key={p.id} className="relative group pointer-events-auto">
+                                                            <div className={`player-peg ${p.role.color} transform hover:scale-110 transition-transform ${isMobile ? 'w-4 h-6' : ''}`} style={{ zIndex: 20 + idx }}></div>
+                                                            <div className={`nametag ${currentPlayer.id === p.id ? 'active' : ''}`}>{p.name}</div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* HUD AREA */}
+                            <div className={`${isMobile || isTablet ? 'w-full h-1/3 min-h-[250px]' : 'w-96 h-full border-l'} bg-white shadow-2xl z-30 flex flex-col border-slate-200`}>
+                                <div className="flex border-b border-slate-100 flex-shrink-0">
+                                    <button onClick={() => setTab('board')} className={`flex-1 py-3 font-bold text-xs uppercase tracking-wider transition-colors ${tab==='board' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-slate-400'}`}>Controls</button>
+                                    <button onClick={() => setTab('logs')} className={`flex-1 py-3 font-bold text-xs uppercase tracking-wider transition-colors ${tab==='logs' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-slate-400'}`}>Logs</button>
+                                </div>
+                                {tab === 'board' ? (
+                                    <div className="flex flex-col h-full overflow-hidden">
+                                        <div className="p-4 bg-slate-50 border-b border-slate-100 flex-shrink-0">
+                                            <div className="flex items-center justify-between mb-2"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Player</span><div className="bg-white border border-slate-200 px-2 py-0.5 rounded-full text-[10px] font-bold text-slate-500 shadow-sm">Turn {Math.floor(players.reduce((a,b)=>a+b.pos,0)/players.length) + 1}</div></div>
+                                            <div className={`p-3 rounded-xl text-white shadow-lg transition-colors duration-500 ${currentPlayer.role.color} relative overflow-hidden`}>
+                                                <div className="absolute right-0 top-0 opacity-10 transform translate-x-1/4 -translate-y-1/4"><i className={`ph-fill ph-${currentPlayer.role.icon} text-8xl`}></i></div>
+                                                <div className="relative z-10 flex items-center justify-between">
+                                                    <div><h2 className="text-xl font-bold leading-tight">{currentPlayer.name}</h2><p className="text-xs font-medium opacity-90">{currentPlayer.role.name}</p></div>
+                                                    <div className="flex items-center gap-1 bg-black/20 px-2 py-1 rounded-lg backdrop-blur-sm"><i className="ph-fill ph-coin text-yellow-300"></i><span className="font-bold text-sm">{currentPlayer.tokens}</span></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex-grow flex flex-col items-center justify-center p-2 relative min-h-[120px]">
+                                            <Dice onRoll={handleRoll} rolling={rolling} value={diceVal} playerColor={currentPlayer.role.color.replace('bg-', '')} />
+                                        </div>
+                                        <div className="p-2 bg-slate-50 border-t border-slate-200 overflow-y-auto max-h-32 flex-shrink-0">
+                                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Leaderboard</div>
+                                            <div className="space-y-1">{[...players].sort((a,b)=>b.tokens-a.tokens).map((p, idx) => (<div key={p.id} className="flex items-center justify-between bg-white p-1.5 rounded border border-slate-100 shadow-sm"><div className="flex items-center gap-2"><div className="text-[10px] font-bold text-slate-400 w-3">{idx+1}</div><div className={`w-1.5 h-1.5 rounded-full ${p.role.color}`}></div><span className="text-xs font-bold text-slate-700">{p.name}</span></div><span className="text-xs font-black text-slate-800">{p.tokens}</span></div>))}</div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex-grow bg-slate-50 p-4 overflow-y-auto">
+                                        <div className="space-y-2">{logs.map((log, i) => (<div key={i} className="bg-white p-2 rounded border border-slate-100 shadow-sm text-xs text-slate-600">{log}</div>))}</div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                    <Modal show={modal.show} title={modal.title} color={modal.color} onClose={closeModal}>{modal.content}</Modal>
+                </div>
+            );
+        };
+
+        // --- MAIN MENU COMPONENT ---
+        const MainMenu = ({ onSelect }) => (
+            <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center relative overflow-hidden">
+                {/* Background Animation */}
+                <div className="absolute inset-0 opacity-10 pointer-events-none">
+                    <div className="absolute top-10 left-10 animate-bounce-slow text-slate-500"><i className="ph-fill ph-tree text-9xl"></i></div>
+                    <div className="absolute bottom-10 right-10 animate-bounce-slow text-slate-500"><i className="ph-fill ph-buildings text-9xl"></i></div>
+                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-blue-500/20 blur-[100px] rounded-full"></div>
+                </div>
+
+                <div className="relative z-10 text-center animate-pop">
+                    <div className="mb-6 inline-block p-5 rounded-3xl bg-gradient-to-br from-blue-600 to-blue-800 shadow-2xl shadow-blue-900/50 border-4 border-white/10">
+                         <i className="ph-fill ph-house-line text-7xl text-white"></i>
+                    </div>
+                    <h1 className="text-6xl md:text-7xl font-black text-white hand-font mb-2 tracking-wide drop-shadow-lg">Safe Builders</h1>
+                    <p className="text-slate-400 text-xl font-bold mb-12 uppercase tracking-widest">Capstone Project • Group 2</p>
+
+                    <div className="flex flex-col md:flex-row gap-8 justify-center items-center">
+                        <button 
+                            onClick={() => onSelect('game')}
+                            className="group w-72 h-48 bg-slate-800 rounded-3xl shadow-xl border-4 border-slate-700 hover:border-emerald-500 transition-all hover:-translate-y-2 flex flex-col items-center justify-center relative overflow-hidden"
+                        >
+                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                            <i className="ph-duotone ph-play-circle text-6xl text-emerald-500 mb-3 group-hover:scale-110 transition-transform"></i>
+                            <span className="text-2xl font-bold text-white tracking-wide group-hover:text-emerald-400 transition-colors">Play Game</span>
+                            <span className="text-xs text-slate-500 uppercase font-bold mt-2">Full Experience</span>
+                        </button>
+
+                        <button 
+                            onClick={() => onSelect('lab')}
+                            className="group w-72 h-48 bg-slate-800 rounded-3xl shadow-xl border-4 border-slate-700 hover:border-blue-500 transition-all hover:-translate-y-2 flex flex-col items-center justify-center relative overflow-hidden"
+                        >
+                            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                            <i className="ph-duotone ph-flask text-6xl text-blue-500 mb-3 group-hover:scale-110 transition-transform"></i>
+                            <span className="text-2xl font-bold text-white tracking-wide group-hover:text-blue-400 transition-colors">Testing Lab</span>
+                            <span className="text-xs text-slate-500 uppercase font-bold mt-2">Device Simulator</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div className="absolute bottom-8 text-slate-600 text-xs font-mono">
+                    v1.0.0 • React • Tailwind • Phosphor
+                </div>
+            </div>
+        );
+
+        // --- ROOT APP WITH MODES ---
+        const App = () => {
+            const [appMode, setAppMode] = useState('menu'); // menu, game, lab
+            const [viewMode, setViewMode] = useState('pc'); // pc, mobile, ipad
+
+            // MAIN MENU
+            if (appMode === 'menu') {
+                return <MainMenu onSelect={setAppMode} />;
+            }
+
+            // FULL GAME MODE
+            if (appMode === 'game') {
+                return (
+                    <div className="w-full h-screen bg-slate-50 overflow-hidden relative">
+                        <GameEngine viewMode="pc" />
+                        <button 
+                            onClick={() => setAppMode('menu')}
+                            className="fixed top-4 right-4 z-[100] bg-white hover:bg-red-50 text-slate-800 hover:text-red-500 p-3 rounded-full shadow-lg border border-slate-200 transition-all hover:scale-110 group"
+                            title="Exit to Menu"
+                        >
+                            <i className="ph-bold ph-x text-xl"></i>
+                        </button>
+                    </div>
+                );
+            }
+
+            // LAB MODE
+            return (
+                <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center relative p-4 md:p-8">
+                    
+                    {/* LAB HEADER CONTROLS */}
+                    <div className="fixed top-0 left-0 right-0 bg-slate-800 text-white p-4 shadow-xl z-[100] flex flex-col md:flex-row items-center justify-between gap-4 border-b border-slate-700">
+                        <div className="flex items-center gap-4">
+                            <button 
+                                onClick={() => setAppMode('menu')}
+                                className="bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white p-2 rounded-lg transition-colors"
+                                title="Back to Menu"
+                            >
+                                <i className="ph-bold ph-arrow-left text-lg"></i>
+                            </button>
+                            <div className="flex items-center gap-3 border-l border-slate-600 pl-4">
+                                <div className="bg-blue-600 p-2 rounded-lg"><i className="ph-bold ph-flask text-xl"></i></div>
+                                <div>
+                                    <h1 className="font-bold text-lg leading-tight">SAFE BUILDERS LAB</h1>
+                                    <p className="text-xs text-slate-400">Prototype Testing Suite v1.0</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="flex bg-slate-700 p-1 rounded-xl">
+                            <button onClick={() => setViewMode('mobile')} className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-bold transition-all ${viewMode === 'mobile' ? 'bg-blue-500 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>
+                                <i className="ph-bold ph-device-mobile"></i> Mobile
+                            </button>
+                            <button onClick={() => setViewMode('ipad')} className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-bold transition-all ${viewMode === 'ipad' ? 'bg-blue-500 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>
+                                <i className="ph-bold ph-device-tablet"></i> Tablet
+                            </button>
+                            <button onClick={() => setViewMode('pc')} className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-bold transition-all ${viewMode === 'pc' ? 'bg-blue-500 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>
+                                <i className="ph-bold ph-desktop"></i> Desktop
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* MAIN STAGE */}
+                    <div className="flex-grow w-full flex items-center justify-center pt-24 pb-12 overflow-auto">
+                        <div className={`device-frame hide-scrollbar ${viewMode === 'mobile' ? 'device-mobile' : viewMode === 'ipad' ? 'device-ipad' : 'device-pc'}`}>
+                            <GameEngine viewMode={viewMode} />
+                        </div>
+                    </div>
+
+                    {/* LAB FOOTER / CREDITS */}
+                    <div className="fixed bottom-0 left-0 right-0 bg-slate-900/90 text-slate-400 text-xs py-3 px-6 backdrop-blur-md flex flex-col md:flex-row justify-between items-center z-[90] border-t border-slate-800">
+                         <div className="flex items-center gap-1 font-bold">
+                            Made with love! <i className="ph-fill ph-heart text-red-500 animate-pulse"></i>
+                        </div>
+                        <div className="font-mono opacity-70">
+                            Total time spent on creating this app: 1-2 hours with Marcus, Melo and Donn
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
